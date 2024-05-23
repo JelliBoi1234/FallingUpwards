@@ -1,0 +1,19 @@
+updatePos: not working
+
+-makes sure the x position of the char is not going past 0
+-makes sure the x position of the char is not going past the SCREENWIDTH
+
+-makes sure the y position of the char is not going past 0
+-makes sure the y position of the char is not going past the SCREENHEIGHT
+
+updateKeys: working
+
+-does jump function using space bar (configured for double jumps)
+
+-moves the character left and right using a and d (relative to player orientation)
+
+-does shifting function to make player stick to surfaces when pressing s or shift
+
+-handles arrow keys to change direction of player gravity
+
+-handles gravity and friction through math
