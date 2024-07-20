@@ -15,7 +15,7 @@ class FullGravitomaton(pygame.sprite.Sprite):
 
         print(self.rect.midtop, self.rect.midleft, self.rect.midright, self.rect.midbottom)
 
-        self.rect.move_ip(startPos[0] - self.rect.width/2, startPos[1] - self.rect.height)
+        self.rect = self.rect.move(startPos[0], startPos[1])
         self.show()
 
         self.momentum = [0, 0]
@@ -53,53 +53,57 @@ class FullGravitomaton(pygame.sprite.Sprite):
 
         x, y = self.force
 
-        if self.rect.x + x < 0:
-            self.rect.move(0, self.rect.y)
+        if self.rect.left + x < 0 and self.rect.left <= 0:
+            self.rect.left = -1
             self.force[0] = 0
             self.collided = True
 
             if self.direction == "left":
                 self.jumping = False
                 self.jumps = 0
+                self.force[0] = 0
 
-        if self.rect.x + x > self.v.SCREEN_WIDTH - self.rect.width:
-            self.rect.move(self.v.SCREEN_WIDTH - self.rect.width, self.rect.y)
+        if self.rect.right + x > self.v.SCREEN_WIDTH and self.rect.right >= self.v.SCREEN_WIDTH:
+            self.rect.right = self.v.SCREEN_WIDTH + 1
             self.force[0] = 0
             self.collided = True
 
             if self.direction == "right":
                 self.jumping = False
                 self.jumps = 0
+                self.force[0] = 0
 
-        if self.rect.y + y < 0:
-            self.rect.move(self.rect.x, 0)
+        if self.rect.top + y < 0 and self.rect.top <= 0:
+            self.rect.top = -1
             self.force[1] = 0
             self.collided = True
 
             if self.direction == "top":
                 self.jumping = False
                 self.jumps = 0
+                self.force[1] = 0
 
-        if self.rect.y + y > self.v.SCREEN_HEIGHT - self.rect.height:
-            self.rect.move(self.rect.x, self.v.SCREEN_HEIGHT - self.rect.height)
+        if self.rect.bottom + y > self.v.SCREEN_HEIGHT and self.rect.bottom >= self.v.SCREEN_HEIGHT:
+            self.rect.bottom = self.v.SCREEN_HEIGHT + 1
             self.force[1] = 0
             self.collided = True
 
             if self.direction == "bottom":
                 self.jumping = False
                 self.jumps = 0
+                self.force[1] = 0
 
-        # print(self.force, (self.rect.x, self.rect.y), self.collided, self.anchored)
+        print(f"Force: {self.force}, momentum: {self.momentum}, Pos: {self.rect.x, self.rect.y}, IsCollided: {self.collided}, IsAnchored: {self.anchored}")
 
         self.rect.move_ip(self.force[0], self.force[1])
 
     def basicMovement(self, key):
         self.momentum = [0, 0]
 
-        if not key[pygame.K_SPACE] and not key[pygame.K_w] and self.jumping and self.jumps < self.maxJumps:
+        if not key[pygame.K_SPACE] and not key[pygame.K_w] and self.jumping and self.jumps <= self.maxJumps:
             self.jumping = False
 
-        if (key[pygame.K_w] or key[pygame.K_SPACE]) and not self.jumping:
+        if (key[pygame.K_w] or key[pygame.K_SPACE]) and not self.jumping and self.jumps < self.maxJumps and not self.anchored:
             self.momentum[1] += self.momentumFactor[1]
             self.jumping = True
             self.jumps += 1
@@ -113,18 +117,14 @@ class FullGravitomaton(pygame.sprite.Sprite):
         else:
             self.moving = False
 
-        if (key[pygame.K_LSHIFT] or key[pygame.K_RSHIFT] or key[pygame.K_s]) and (self.collided or self.anchored):
+        if (key[pygame.K_LSHIFT] or key[pygame.K_RSHIFT] or key[pygame.K_s]) and self.collided and not self.jumping:
             self.force = [0, 0]
             self.momentum = [0, 0]
             self.anchored = True
-            self.fall = False
             self.jumping = False
             self.jumps = 0
         else:
-            self.fall = True
             self.anchored = False
-
-        self._refreshDirections()
 
     def directionUpdate(self, key):
 
@@ -147,6 +147,7 @@ class FullGravitomaton(pygame.sprite.Sprite):
 
     def gravityUpdate(self):
 
+        # makes the player slow down when moving (for top and bottom sides, only enacting when the player is moving)
         if self.force[0] == 0:
             pass
         elif not self.jumping and self.force[0] != 0 and self.direction == "bottom":
@@ -154,6 +155,7 @@ class FullGravitomaton(pygame.sprite.Sprite):
         elif not self.jumping and self.force[0] != 0 and self.direction == "top":
             self.momentum[0] += self.force[0]/self.friction
 
+        # makes the player slow down when moving (for right and left sides, only enacting when the player is moving)
         if self.force[1] == 0:
             pass
         elif not self.jumping and self.force[1] != 0 and self.direction == "right":
@@ -161,10 +163,9 @@ class FullGravitomaton(pygame.sprite.Sprite):
         elif not self.jumping and self.force[1] != 0 and self.direction == "left":
             self.momentum[0] -= self.force[1]/self.friction
 
-        if self.fall and not self.collided and not self.anchored:
+        # makes player fall (momentum is based on what side the player is on)
+        if self.fall and not self.anchored:
             self.momentum[1] += self.gravity
-
-        self._refreshDirections()
 
     def run(self):
         key = pygame.key.get_pressed()
@@ -175,7 +176,11 @@ class FullGravitomaton(pygame.sprite.Sprite):
 
         self.gravityUpdate()
 
+        self._refreshDirections()
+
         self.updatePos()
+
+        self.recenter(key)
 
         self.show()
 
@@ -184,6 +189,12 @@ class FullGravitomaton(pygame.sprite.Sprite):
                            "top": [-self.momentum[0], -self.momentum[1]],
                            "left": [-self.momentum[1], self.momentum[0]],
                            "right": [self.momentum[1], -self.momentum[0]]}
+
+    def recenter(self, keys):
+        if keys[pygame.K_r]:
+            self.force = [0, 0]
+            self.momentum = [0, 0]
+            self.rect = self.rect.move(self.v.SCREEN_WIDTH/2, self.v.SCREEN_HEIGHT/2)
 
     def rotate(self, a):
         self.surf = pygame.transform.rotate(self.surf, a - self.rotation)
